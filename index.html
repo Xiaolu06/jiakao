@@ -536,7 +536,20 @@ let currentMode = null;    // 'student' 或 'coach'
 let coachTimer = null;
 let coachCountdownValue = 0;
 let coachAutoPlay = true;  // 教练模式是否自动播放下一题
-let audioElement = null;   // 音频播放器
+let audioElement = null;   // 当前音频播放器
+let audioSession = 0;      // 音频会话 id（防止旧会话回调覆盖新会话）
+// 音频预加载池
+const audioPreloadPool = {};
+(function preloadAllAudio(){
+  for (let i = 1; i <= 15; i++) {
+    try {
+      const a = new Audio(`audio/${i}.mp3`);
+      a.preload = 'auto';
+      a.load();
+      audioPreloadPool[i] = a;
+    } catch (e) {}
+  }
+})();
  
 // ============ 工具函数 ============
 function shuffle(arr) {
@@ -555,50 +568,113 @@ function buildExamQuestions() {
 }
  
 // ============ 语音播报 ============
-// 尝试播放音频文件，不存在则回退到语音合成，播放完毕后调用 onEnd 回调
+// 尝试播放音频文件（优先使用预加载对象），不存在则回退到语音合成，播放完毕后调用 onEnd 回调
 function playAudio(qid, text, onEnd) {
+  // 新会话，之前的任何回调失效
+  const mySession = ++audioSession;
   stopAudio();
-  const audioPath = `audio/${qid}.mp3`;
-  audioElement = new Audio(audioPath);
-  audioElement.onended = () => {
+
+  let fallbackDone = false;
+  const safeEnd = () => {
+    // 只允许当前会话触发 onEnd，且只触发一次
+    if (mySession !== audioSession) return;
+    if (audioFallbackTimer) { clearTimeout(audioFallbackTimer); audioFallbackTimer = null; }
     audioElement = null;
-    if (onEnd) onEnd();
+    if (onEnd && !fallbackDone) {
+      fallbackDone = true;
+      try { onEnd(); } catch(e) {}
+    }
   };
-  audioElement.onerror = () => {
-    // 音频文件不存在，回退到语音合成
-    speak(text, onEnd);
+
+  // 兜底超时：12 秒后强制结束（防止 onended 因任何浏览器兼容问题不触发）
+  let audioFallbackTimer = setTimeout(() => {
+    safeEnd();
+  }, 12000);
+
+  // 优先使用预加载的 Audio 对象（克隆，不共用实例，避免影响预加载）
+  let audio;
+  if (audioPreloadPool[qid]) {
+    audio = audioPreloadPool[qid].cloneNode(true);
+  } else {
+    audio = new Audio(`audio/${qid}.mp3`);
+    audio.preload = 'auto';
+  }
+  audioElement = audio;
+
+  // 先绑定事件，再 play
+  audio.onended = safeEnd;
+  audio.onpause = () => {
+    // 有些浏览器 seek 到末尾或手动暂停也会触发 onpause，但只有真正播放结束时才 safeEnd
+    if (audio.ended || (audio.currentTime > 0 && audio.duration > 0 && audio.currentTime >= audio.duration - 0.05)) {
+      safeEnd();
+    }
   };
-  audioElement.play().catch(() => {
-    // 播放失败，回退到语音合成
-    speak(text, onEnd);
-  });
+  audio.onerror = () => {
+    if (mySession !== audioSession) return;
+    // 音频文件出错，回退到语音合成
+    clearTimeout(audioFallbackTimer);
+    speak(text, onEnd, mySession);
+  };
+
+  try {
+    const p = audio.play();
+    if (p && typeof p.catch === 'function') {
+      p.catch(() => {
+        if (mySession !== audioSession) return;
+        clearTimeout(audioFallbackTimer);
+        speak(text, onEnd, mySession);
+      });
+    }
+  } catch(e) {
+    if (mySession !== audioSession) return;
+    clearTimeout(audioFallbackTimer);
+    speak(text, onEnd, mySession);
+  }
 }
 
 function stopAudio() {
   if (audioElement) {
-    audioElement.pause();
+    try { audioElement.pause(); } catch(e) {}
     audioElement = null;
   }
-  if (window.speechSynthesis) window.speechSynthesis.cancel();
+  if (window.speechSynthesis) {
+    try { window.speechSynthesis.cancel(); } catch(e) {}
+  }
+  // 中止当前会话（之前的 onEnd 不再生效）
+  audioSession++;
 }
 
-function speak(text, onEnd) {
+function speak(text, onEnd, sessionId) {
+  // 如果调用者没有提供 sessionId，就创建一个新会话
+  if (typeof sessionId !== 'number') {
+    sessionId = ++audioSession;
+  }
   if (!('speechSynthesis' in window)) {
-    if (onEnd) onEnd();
+    if (onEnd && sessionId === audioSession) { try { onEnd(); } catch(e) {} }
     return;
   }
+  let ended = false;
+  const safeEnd = () => {
+    if (ended) return;
+    ended = true;
+    if (sessionId === audioSession && onEnd) {
+      try { onEnd(); } catch(e) {}
+    }
+  };
+  // 兜底：语音合成最长 12 秒强制结束
+  const guard = setTimeout(safeEnd, 12000);
   try {
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.lang = 'zh-CN';
     u.rate = 0.95;
     u.pitch = 1;
-    u.onend = () => { if (onEnd) onEnd(); };
-    // 如果语音合成出错也触发回调
-    u.onerror = () => { if (onEnd) onEnd(); };
+    u.onend = () => { clearTimeout(guard); safeEnd(); };
+    u.onerror = () => { clearTimeout(guard); safeEnd(); };
     window.speechSynthesis.speak(u);
   } catch(e) {
-    if (onEnd) onEnd();
+    clearTimeout(guard);
+    safeEnd();
   }
 }
 
