@@ -298,6 +298,29 @@ body {
   border-radius: 20px;
   display: inline-block;
 }
+.coach-controls {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+.coach-btn {
+  flex: 1;
+  padding: 14px 8px;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #fff;
+  transition: all 0.15s;
+}
+.coach-btn:active { transform: scale(0.95); }
+.coach-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.coach-btn-prev { background: linear-gradient(135deg, #576574, #636e72); }
+.coach-btn-next { background: linear-gradient(135deg, #6c5ce7, #a29bfe); }
+.coach-btn-auto { background: linear-gradient(135deg, #006266, #009432); }
+.coach-btn-auto.paused { background: linear-gradient(135deg, #b71540, #eb4d4b); }
+.coach-btn-restart { background: linear-gradient(135deg, #e55039, #fa8231); }
 .back-btn {
   width: 100%;
   padding: 14px;
@@ -436,7 +459,16 @@ body {
       </div>
 
       <div class="coach-timer-box">
-        <div class="coach-timer-text" id="coachTimerText">6 秒后下一题</div>
+        <div class="coach-timer-text" id="coachTimerText">5 秒后下一题</div>
+      </div>
+
+      <div class="coach-controls">
+        <button class="coach-btn coach-btn-prev" id="coachBtnPrev" onclick="coachPrev()">◀ 上一题</button>
+        <button class="coach-btn coach-btn-next" onclick="coachManualNext()">下一题 ▶</button>
+        <button class="coach-btn coach-btn-auto" id="coachBtnAuto" onclick="coachToggleAuto()">⏸ 暂停自动</button>
+      </div>
+      <div class="coach-controls">
+        <button class="coach-btn coach-btn-restart" onclick="coachRestart()">🔄 重新开始</button>
       </div>
     </div>
   </div>
@@ -503,6 +535,7 @@ let autoNextTimer = null;
 let currentMode = null;    // 'student' 或 'coach'
 let coachTimer = null;
 let coachCountdownValue = 0;
+let coachAutoPlay = true;  // 教练模式是否自动播放下一题
 let audioElement = null;   // 音频播放器
  
 // ============ 工具函数 ============
@@ -516,24 +549,28 @@ function shuffle(arr) {
 }
  
 function buildExamQuestions() {
-  // 出全部 15 道题：第1题固定 + 中间12题全部 + 最后2题固定
-  return [FIXED_FIRST, ...MIDDLE_QUESTIONS, ...FIXED_LAST_TWO];
+  // 第1题固定 + 中间12题随机顺序全部出 + 最后2题固定
+  const middle = shuffle(MIDDLE_QUESTIONS);
+  return [FIXED_FIRST, ...middle, ...FIXED_LAST_TWO];
 }
  
 // ============ 语音播报 ============
-// 尝试播放音频文件，不存在则回退到语音合成
-function playAudio(qid, text) {
-  // 停止当前播放
+// 尝试播放音频文件，不存在则回退到语音合成，播放完毕后调用 onEnd 回调
+function playAudio(qid, text, onEnd) {
   stopAudio();
   const audioPath = `audio/${qid}.mp3`;
   audioElement = new Audio(audioPath);
+  audioElement.onended = () => {
+    audioElement = null;
+    if (onEnd) onEnd();
+  };
   audioElement.onerror = () => {
     // 音频文件不存在，回退到语音合成
-    speak(text);
+    speak(text, onEnd);
   };
   audioElement.play().catch(() => {
     // 播放失败，回退到语音合成
-    speak(text);
+    speak(text, onEnd);
   });
 }
 
@@ -545,16 +582,24 @@ function stopAudio() {
   if (window.speechSynthesis) window.speechSynthesis.cancel();
 }
 
-function speak(text) {
-  if (!('speechSynthesis' in window)) return;
+function speak(text, onEnd) {
+  if (!('speechSynthesis' in window)) {
+    if (onEnd) onEnd();
+    return;
+  }
   try {
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.lang = 'zh-CN';
     u.rate = 0.95;
     u.pitch = 1;
+    u.onend = () => { if (onEnd) onEnd(); };
+    // 如果语音合成出错也触发回调
+    u.onerror = () => { if (onEnd) onEnd(); };
     window.speechSynthesis.speak(u);
-  } catch(e) {}
+  } catch(e) {
+    if (onEnd) onEnd();
+  }
 }
 
 function repeatVoice() {
@@ -720,12 +765,10 @@ function startQuestion() {
   // 每次新题目时将灯光重置？根据真实考试，灯光状态是保留的，这里保留上一题状态
   // 但用户如果需要切换需要操作。我们保留延续性，但第一题开始前初始为关闭
  
-  // 先播报（优先播放音频文件，无音频时回退语音合成）
-  playAudio(q.id, q.text);
-  // 播报稍作延迟后开始倒计时（让用户听题）
-  setTimeout(() => {
-    startCountdown();
-  }, 500);
+  // 先播报（优先播放音频文件，无音频时回退语音合成），播放完毕后开始倒计时
+  playAudio(q.id, q.text, () => {
+    if (examActive) startCountdown();
+  });
 }
  
 // ============ 模式选择 ============
@@ -834,12 +877,18 @@ function restartExam() {
 function startCoachMode() {
   examQuestions = buildExamQuestions();
   currentIdx = 0;
+  coachAutoPlay = true;
+  updateCoachAutoBtn();
   document.getElementById('coachScreen').style.display = 'block';
   document.getElementById('resultScreen').style.display = 'none';
-  coachNextQuestion();
+  coachShowQuestion();
 }
 
-function coachNextQuestion() {
+function coachShowQuestion() {
+  stopCoachTimer();
+  stopAudio();
+
+  if (currentIdx < 0) currentIdx = 0;
   if (currentIdx >= examQuestions.length) {
     finishCoachMode();
     return;
@@ -851,12 +900,23 @@ function coachNextQuestion() {
   document.getElementById('coachQIndex').textContent = `第 ${currentIdx + 1} / ${examQuestions.length} 题`;
   document.getElementById('coachProgressFill').style.width = (currentIdx / examQuestions.length * 100) + '%';
   document.getElementById('coachAnswerText').textContent = answerText(q);
+  document.getElementById('coachBtnPrev').disabled = (currentIdx === 0);
 
-  // 播放音频
-  playAudio(q.id, q.text);
+  // 播放音频，播放完毕后开始5秒倒计时（自动模式下）
+  playAudio(q.id, q.text, () => {
+    if (coachAutoPlay && currentIdx < examQuestions.length) {
+      coachStartCountdown();
+    }
+  });
 
-  // 6秒后下一题
-  coachCountdownValue = 6;
+  // 手动模式下显示提示
+  if (!coachAutoPlay) {
+    document.getElementById('coachTimerText').textContent = '手动模式 — 点击"下一题"继续';
+  }
+}
+
+function coachStartCountdown() {
+  coachCountdownValue = 5;
   document.getElementById('coachTimerText').textContent = `${coachCountdownValue} 秒后下一题`;
 
   if (coachTimer) clearInterval(coachTimer);
@@ -866,15 +926,67 @@ function coachNextQuestion() {
     if (coachCountdownValue <= 0) {
       clearInterval(coachTimer);
       coachTimer = null;
-      currentIdx++;
-      coachNextQuestion();
+      coachManualNext();
     }
   }, 1000);
 }
 
+// 手动下一题（自动模式下也生效，并维持自动状态）
+function coachManualNext() {
+  currentIdx++;
+  coachShowQuestion();
+}
+
+// 上一题（可连续点击）
+function coachPrev() {
+  if (currentIdx > 0) {
+    currentIdx--;
+    coachShowQuestion();
+  }
+}
+
+// 切换自动/手动模式
+function coachToggleAuto() {
+  coachAutoPlay = !coachAutoPlay;
+  updateCoachAutoBtn();
+  if (coachAutoPlay) {
+    // 恢复自动：如果当前没有在倒计时，启动倒计时
+    if (!coachTimer && currentIdx < examQuestions.length) {
+      coachStartCountdown();
+    }
+  } else {
+    // 暂停自动：停止倒计时
+    stopCoachTimer();
+    document.getElementById('coachTimerText').textContent = '手动模式 — 点击"下一题"继续';
+  }
+}
+
+function updateCoachAutoBtn() {
+  const btn = document.getElementById('coachBtnAuto');
+  if (coachAutoPlay) {
+    btn.textContent = '⏸ 暂停自动';
+    btn.classList.remove('paused');
+  } else {
+    btn.textContent = '▶ 开启自动';
+    btn.classList.add('paused');
+  }
+}
+
+// 中途重新开始教练模式
+function coachRestart() {
+  stopCoachTimer();
+  stopAudio();
+  startCoachMode();
+}
+
 function coachRepeatVoice() {
   if (examQuestions[currentIdx]) {
-    playAudio(examQuestions[currentIdx].id, examQuestions[currentIdx].text);
+    // 重新播报后，如果是自动模式，重新开始5秒倒计时
+    playAudio(examQuestions[currentIdx].id, examQuestions[currentIdx].text, () => {
+      if (coachAutoPlay && currentIdx < examQuestions.length) {
+        coachStartCountdown();
+      }
+    });
   }
 }
 
