@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>夜间灯光模拟考试</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  min-height: 100vh;
+  color: #fff;
+  padding: 16px;
+  user-select: none;
+}
+.container { max-width: 500px; margin: 0 auto; }
+ 
+.header {
+  text-align: center;
+  padding: 16px 0;
+}
+.header h1 {
+  font-size: 22px;
+  color: #ffd700;
+  margin-bottom: 4px;
+}
+.header p { font-size: 13px; color: #8892b0; }
+ 
+.panel {
+  background: rgba(255,255,255,0.05);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 16px;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+ 
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  margin-bottom: 10px;
+  color: #ccd6f6;
+}
+.progress-bar {
+  height: 6px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #64ffda, #ffd700);
+  width: 0%;
+  transition: width 0.3s;
+}
+ 
+.countdown-box {
+  text-align: center;
+  margin-bottom: 20px;
+}
+.countdown-num {
+  font-size: 64px;
+  font-weight: bold;
+  color: #ff6b6b;
+  font-variant-numeric: tabular-nums;
+  transition: all 0.3s;
+}
+.countdown-num.warning { color: #ffd700; }
+.countdown-num.danger { color: #ff4757; animation: shake 0.3s; }
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+.countdown-label { font-size: 13px; color: #8892b0; margin-top: -4px; }
+ 
+.question-box {
+  background: rgba(0,0,0,0.3);
+  border-radius: 12px;
+  padding: 18px;
+  margin-bottom: 20px;
+  min-height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.question-text {
+  font-size: 18px;
+  text-align: center;
+  line-height: 1.5;
+  color: #e6f1ff;
+}
+.question-text .q-num { color: #64ffda; font-weight: bold; margin-right: 8px; }
+ 
+.feedback {
+  text-align: center;
+  padding: 12px;
+  border-radius: 10px;
+  margin-bottom: 16px;
+  font-size: 15px;
+  font-weight: 600;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s;
+  opacity: 0;
+}
+.feedback.show { opacity: 1; }
+.feedback.correct { background: rgba(100,255,218,0.15); color: #64ffda; border: 1px solid rgba(100,255,218,0.3); }
+.feedback.wrong { background: rgba(255,107,107,0.15); color: #ff6b6b; border: 1px solid rgba(255,107,107,0.3); }
+.feedback.timeout { background: rgba(255,215,0,0.15); color: #ffd700; border: 1px solid rgba(255,215,0,0.3); }
+ 
+.status-box {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.status-item {
+  background: rgba(0,0,0,0.25);
+  border-radius: 10px;
+  padding: 12px;
+  text-align: center;
+}
+.status-label { font-size: 12px; color: #8892b0; margin-bottom: 6px; }
+.status-value {
+  font-size: 16px;
+  font-weight: bold;
+  color: #8892b0;
+  transition: all 0.3s;
+}
+.status-value.active { color: #ffd700; text-shadow: 0 0 10px rgba(255,215,0,0.5); }
+ 
+.buttons-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.btn-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.btn-row-center {
+  display: flex;
+  justify-content: center;
+}
+.btn-row-center .btn {
+  min-width: 60%;
+  max-width: 100%;
+}
+.btn {
+  padding: 16px 10px;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+}
+.btn:active { transform: scale(0.96); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+ 
+.btn-off { background: linear-gradient(135deg, #576574, #636e72); }
+.btn-outline { background: linear-gradient(135deg, #006266, #009432); }
+.btn-near { background: linear-gradient(135deg, #1e3799, #4a69bd); }
+.btn-far { background: linear-gradient(135deg, #b71540, #eb4d4b); }
+.btn-hazard { background: linear-gradient(135deg, #e55039, #fa8231); }
+.btn-hazard.active { box-shadow: 0 0 20px rgba(250,130,49,0.6); animation: blink 0.6s infinite; }
+@keyframes blink {
+  0%,100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+ 
+.big-btn {
+  grid-column: span 2;
+  padding: 18px;
+  font-size: 16px;
+  background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+}
+.start-btn, .restart-btn {
+  width: 100%;
+  padding: 18px;
+  font-size: 18px;
+  background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+  border: none;
+  border-radius: 14px;
+  color: #fff;
+  font-weight: bold;
+  cursor: pointer;
+  margin-top: 8px;
+}
+.start-btn:active, .restart-btn:active { transform: scale(0.97); }
+ 
+.result-screen { text-align: center; }
+.result-score {
+  font-size: 72px;
+  font-weight: bold;
+  margin: 16px 0;
+  color: #ffd700;
+}
+.result-detail {
+  margin: 20px 0;
+  text-align: left;
+}
+.result-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  font-size: 13px;
+}
+.result-row:last-child { border-bottom: none; }
+.result-row .q { color: #ccd6f6; flex: 1; margin-right: 10px; }
+.result-row .mark-pass { color: #64ffda; }
+.result-row .mark-fail { color: #ff6b6b; }
+ 
+.speaker-btn {
+  display: inline-block;
+  background: rgba(100,255,218,0.15);
+  border: 1px solid rgba(100,255,218,0.3);
+  color: #64ffda;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  cursor: pointer;
+  margin-top: 10px;
+}
+.speaker-btn:active { transform: scale(0.95); }
+ 
+.score-count {
+  text-align: center;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(0,0,0,0.25);
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+.score-count .pass { color: #64ffda; font-weight: bold; }
+.score-count .fail { color: #ff6b6b; font-weight: bold; }
+
+/* 模式选择 */
+.mode-cards { display: flex; flex-direction: column; gap: 16px; }
+.mode-card {
+  background: rgba(255,255,255,0.05);
+  border: 2px solid rgba(255,255,255,0.1);
+  border-radius: 16px;
+  padding: 24px 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+.mode-card:active { transform: scale(0.97); }
+.mode-card .mode-icon { font-size: 48px; margin-bottom: 12px; }
+.mode-card .mode-title { font-size: 18px; font-weight: bold; margin-bottom: 6px; }
+.mode-card .mode-desc { font-size: 13px; color: #8892b0; line-height: 1.6; }
+.mode-card.student { border-color: rgba(108,92,231,0.5); }
+.mode-card.student .mode-title { color: #a29bfe; }
+.mode-card.coach { border-color: rgba(255,215,0,0.4); }
+.mode-card.coach .mode-title { color: #ffd700; }
+
+/* 教练模式 */
+.coach-answer-box {
+  background: rgba(100,255,218,0.1);
+  border: 1px solid rgba(100,255,218,0.3);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+.coach-answer-label {
+  font-size: 12px;
+  color: #64ffda;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+.coach-answer-text {
+  font-size: 18px;
+  font-weight: bold;
+  color: #e6f1ff;
+}
+.coach-timer-box {
+  text-align: center;
+  margin-top: 12px;
+}
+.coach-timer-text {
+  font-size: 14px;
+  color: #8892b0;
+  padding: 8px 16px;
+  background: rgba(0,0,0,0.2);
+  border-radius: 20px;
+  display: inline-block;
+}
+.coach-controls {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+.coach-btn {
+  flex: 1;
+  padding: 14px 8px;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #fff;
+  transition: all 0.15s;
+}
+.coach-btn:active { transform: scale(0.95); }
+.coach-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.coach-btn-prev { background: linear-gradient(135deg, #576574, #636e72); }
+.coach-btn-next { background: linear-gradient(135deg, #6c5ce7, #a29bfe); }
+.coach-btn-auto { background: linear-gradient(135deg, #006266, #009432); }
+.coach-btn-auto.paused { background: linear-gradient(135deg, #b71540, #eb4d4b); }
+.coach-btn-restart { background: linear-gradient(135deg, #e55039, #fa8231); }
+.back-btn {
+  width: 100%;
+  padding: 14px;
+  font-size: 15px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 14px;
+  color: #8892b0;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 10px;
+}
+.back-btn:active { transform: scale(0.97); }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>🚗 夜间灯光模拟考试</h1>
+    <p id="headerSubtitle">请选择模式开始</p>
+  </div>
+
+  <!-- 模式选择界面 -->
+  <div id="modeScreen" class="panel">
+    <div class="mode-cards">
+      <div class="mode-card student" onclick="selectMode('student')">
+        <div class="mode-icon">🎓</div>
+        <div class="mode-title">学员模式</div>
+        <div class="mode-desc">模拟考试，5秒内完成灯光操作<br>共 15 道题，自动评分</div>
+      </div>
+      <div class="mode-card coach" onclick="selectMode('coach')">
+        <div class="mode-icon">👨‍🏫</div>
+        <div class="mode-title">教练模式</div>
+        <div class="mode-desc">自动播报题目和答案<br>每题间隔 6 秒，适合演示教学</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 学员模式 - 开始界面 -->
+  <div id="startScreen" class="panel" style="display:none;">
+    <div style="text-align:center; padding: 10px 0;">
+      <div style="font-size: 56px; margin-bottom: 16px;">💡</div>
+      <p style="color:#ccd6f6; line-height:1.8; font-size:14px; margin-bottom:20px;">
+        共 15 道题<br>
+        请根据语音播报内容<br>
+        在 5 秒内完成对应灯光操作
+      </p>
+      <button class="start-btn" onclick="startExam()">开始考试</button>
+      <button class="back-btn" onclick="showModeScreen()">返回选择模式</button>
+    </div>
+  </div>
+ 
+  <!-- 考试界面 -->
+  <div id="examScreen" style="display:none;">
+    <div class="panel">
+      <div class="progress-info">
+        <span id="qIndex">第 1 / 15 题</span>
+        <span id="scoreText">✓ 0 / ✗ 0</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+ 
+      <div class="countdown-box">
+        <div class="countdown-num" id="countdownNum">5</div>
+        <div class="countdown-label">剩余操作时间（秒）</div>
+      </div>
+ 
+      <div class="question-box">
+        <div class="question-text" id="questionText">
+          <span class="q-num" id="qNum">1</span>
+          <span id="qContent">准备开始...</span>
+        </div>
+      </div>
+ 
+      <div id="speakerBtnWrap" style="text-align:center;">
+        <button class="speaker-btn" onclick="repeatVoice()">🔊 重新播报</button>
+      </div>
+    </div>
+ 
+    <div class="panel">
+      <div class="status-box">
+        <div class="status-item">
+          <div class="status-label">灯光档位</div>
+          <div class="status-value" id="lightStatus">关闭 (0档)</div>
+        </div>
+        <div class="status-item">
+          <div class="status-label">双闪警示灯</div>
+          <div class="status-value" id="hazardStatus">关闭</div>
+        </div>
+      </div>
+ 
+      <div class="buttons-grid">
+        <div class="btn-row">
+          <button class="btn btn-off" id="btn0" onclick="setLight(0)">▣ 关闭 (0档)</button>
+          <button class="btn btn-outline" id="btn1" onclick="setLight(1)">◯ 示廓灯 (1档)</button>
+        </div>
+        <div class="btn-row-center">
+          <button class="btn btn-hazard" id="btnHazard" onclick="toggleHazard()">⚠ 双闪警示灯</button>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-near" id="btn2" onclick="setLight(2)">◎ 近光灯 (2档)</button>
+          <button class="btn btn-far" id="btn3" onclick="setLight(3)">✦ 远光灯 (3档)</button>
+        </div>
+      </div>
+ 
+      <div style="margin-top: 14px;">
+        <button class="btn big-btn" onclick="submitAnswer()">确认提交</button>
+      </div>
+    </div>
+ 
+    <div class="feedback" id="feedback"></div>
+  </div>
+
+  <!-- 教练模式界面 -->
+  <div id="coachScreen" style="display:none;">
+    <div class="panel">
+      <div class="progress-info">
+        <span id="coachQIndex">第 1 / 15 题</span>
+        <span style="color:#ffd700;">教练演示模式</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="coachProgressFill"></div></div>
+
+      <div class="question-box">
+        <div class="question-text">
+          <span class="q-num" id="coachQNum">1</span>
+          <span id="coachQContent">准备开始...</span>
+        </div>
+      </div>
+
+      <div class="coach-answer-box">
+        <div class="coach-answer-label">✓ 正确答案</div>
+        <div class="coach-answer-text" id="coachAnswerText">-</div>
+      </div>
+
+      <div style="text-align:center;">
+        <button class="speaker-btn" onclick="coachRepeatVoice()">🔊 重新播报</button>
+      </div>
+
+      <div class="coach-timer-box">
+        <div class="coach-timer-text" id="coachTimerText">5 秒后下一题</div>
+      </div>
+
+      <div class="coach-controls">
+        <button class="coach-btn coach-btn-prev" id="coachBtnPrev" onclick="coachPrev()">◀ 上一题</button>
+        <button class="coach-btn coach-btn-next" onclick="coachManualNext()">下一题 ▶</button>
+        <button class="coach-btn coach-btn-auto" id="coachBtnAuto" onclick="coachToggleAuto()">⏸ 暂停自动</button>
+      </div>
+      <div class="coach-controls">
+        <button class="coach-btn coach-btn-restart" onclick="coachRestart()">🔄 重新开始</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 结果界面 -->
+  <div id="resultScreen" style="display:none;">
+    <div class="panel result-screen">
+      <div style="font-size: 64px; margin-bottom: 8px;" id="resultEmoji">🎉</div>
+      <h2 style="color:#ccd6f6; font-size: 20px;" id="resultTitle">考试结束</h2>
+      <div class="result-score" id="resultScore">100</div>
+      <div style="color:#8892b0; font-size: 14px;" id="resultSubtitle">分</div>
+      <div class="score-count">
+        <span class="pass" id="passCount">正确：11 题</span>
+        <span style="color:#8892b0;"> / </span>
+        <span class="fail" id="failCount">错误：0 题</span>
+      </div>
+      <button class="restart-btn" id="restartBtn" onclick="restartExam()">重新考试</button>
+      <button class="back-btn" onclick="showModeScreen()">返回选择模式</button>
+      <div class="result-detail" id="resultDetail"></div>
+    </div>
+  </div>
+</div>
+ 
+<script>
+// ============ 题目数据 ============
+const FIXED_FIRST = {
+  id: 1,
+  text: '请根据播报的驾驶场景，在播报后5秒内完成灯光操作。请开启前照灯',
+  answer: { light: 2, hazard: false }
+};
+ 
+const MIDDLE_QUESTIONS = [
+  { id: 2,  text: '夜间在照明不良的道路行驶',                answer: { light: 3, hazard: false } },
+  { id: 3,  text: '夜间超车',                                 answer: { light: 3, hazard: false } },
+  { id: 4,  text: '夜间通过人行横道',                         answer: { light: 3, hazard: false } },
+  { id: 5,  text: '夜间通过拱桥',                             answer: { light: 3, hazard: false } },
+  { id: 6,  text: '夜间通过坡路',                             answer: { light: 3, hazard: false } },
+  { id: 7,  text: '夜间通过急弯',                             answer: { light: 3, hazard: false } },
+  { id: 8,  text: '夜间通过没有交通信号灯控制的路口',         answer: { light: 3, hazard: false } },
+  { id: 9,  text: '夜间通过路口',                             answer: { light: 2, hazard: false } },
+  { id: 10, text: '夜间在有信号灯控制的路口转弯',             answer: { light: 2, hazard: false } },
+  { id: 11, text: '夜间会车',                                 answer: { light: 2, hazard: false } },
+  { id: 12, text: '夜间同方向近距离跟车行驶',                 answer: { light: 2, hazard: false } },
+  { id: 13, text: '夜间在有路灯，照明良好的道路上行驶',       answer: { light: 2, hazard: false } }
+];
+ 
+const FIXED_LAST_TWO = [
+  { id: 14, text: '请靠边停车',                               answer: { light: 1, hazard: true } },
+  { id: 15, text: '夜间灯光结束，请关闭所有灯光',             answer: { light: 0, hazard: false } }
+];
+ 
+// ============ 状态 ============
+let examQuestions = [];
+let currentIdx = 0;
+let currentLight = 0;      // 0关闭 1示廓 2近光 3远光
+let currentHazard = false;
+let passCount = 0;
+let failCount = 0;
+let results = [];
+let countdownTimer = null;
+let countdownValue = 0;
+let examActive = false;
+let autoNextTimer = null;
+let currentMode = null;    // 'student' 或 'coach'
+let coachTimer = null;
+let coachCountdownValue = 0;
+let coachAutoPlay = true;  // 教练模式是否自动播放下一题
+let audioElement = null;   // 当前音频播放器
+// 音频预加载池
+const audioPreloadPool = {};
+(function preloadAllAudio(){
+  for (let i = 1; i <= 15; i++) {
+    try {
+      const a = new Audio(`audio/${i}.mp3`);
+      a.preload = 'auto';
+      a.load();
+      audioPreloadPool[i] = a;
+    } catch (e) {}
+  }
+})();
+ 
+// ============ 工具函数 ============
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+ 
+function buildExamQuestions() {
+  // 第1题固定 + 中间12题随机顺序全部出 + 最后2题固定
+  const middle = shuffle(MIDDLE_QUESTIONS);
+  return [FIXED_FIRST, ...middle, ...FIXED_LAST_TWO];
+}
+ 
+// ============ 语音播报 ============
+function playAudio(qid, text, onEnd) {
+  // 停止之前的音频
+  if (audioElement) {
+    audioElement.pause();
+    audioElement = null;
+  }
+  // 使用预加载的音频元素，重置播放位置，避免重复下载
+  let audio;
+  if (audioPreloadPool[qid]) {
+    audio = audioPreloadPool[qid];
+    audio.currentTime = 0;
+  } else {
+    audio = new Audio('audio/' + qid + '.mp3');
+    audio.preload = 'auto';
+  }
+  audioElement = audio;
+
+  // 确保 onEnd 只被调用一次
+  let called = false;
+  const safeOnEnd = () => {
+    if (called) return;
+    called = true;
+    audioElement = null;
+    if (onEnd) onEnd();
+  };
+
+  // 音频播放结束
+  audio.onended = safeOnEnd;
+  // 音频加载/播放出错时也调用 onEnd，防止卡死
+  audio.onerror = () => {
+    audioElement = null;
+    safeOnEnd();
+  };
+
+  // 播放并处理 Promise
+  const playPromise = audio.play();
+  if (playPromise !== undefined) {
+    playPromise.catch(() => {
+      // 播放被浏览器阻止（如自动播放策略），仍然调用 onEnd
+      audioElement = null;
+      safeOnEnd();
+    });
+  }
+}
+
+function stopAudio() {
+  if (audioElement) {
+    try { audioElement.pause(); } catch(e) {}
+    audioElement = null;
+  }
+}
+
+function repeatVoice() {
+  if (examQuestions[currentIdx]) {
+    playAudio(examQuestions[currentIdx].id, examQuestions[currentIdx].text);
+  }
+}
+ 
+// ============ UI 更新 ============
+function updateLightDisplay() {
+  const labels = ['关闭 (0档)', '示廓灯 (1档)', '近光灯 (2档)', '远光灯 (3档)'];
+  document.getElementById('lightStatus').textContent = labels[currentLight];
+  document.getElementById('lightStatus').className = 'status-value' + (currentLight > 0 ? ' active' : '');
+ 
+  document.getElementById('hazardStatus').textContent = currentHazard ? '开启' : '关闭';
+  document.getElementById('hazardStatus').className = 'status-value' + (currentHazard ? ' active' : '');
+ 
+  const btnHazard = document.getElementById('btnHazard');
+  if (currentHazard) btnHazard.classList.add('active'); else btnHazard.classList.remove('active');
+ 
+  ['btn0','btn1','btn2','btn3'].forEach((id, idx) => {
+    const el = document.getElementById(id);
+    if (idx === currentLight) el.style.boxShadow = '0 0 16px rgba(255,255,255,0.4), inset 0 0 0 2px rgba(255,215,0,0.5)';
+    else el.style.boxShadow = 'none';
+  });
+}
+ 
+function updateProgress() {
+  const total = examQuestions.length;
+  document.getElementById('qIndex').textContent = `第 ${currentIdx + 1} / ${total} 题`;
+  document.getElementById('qNum').textContent = (currentIdx + 1);
+  document.getElementById('scoreText').textContent = `✓ ${passCount} / ✗ ${failCount}`;
+  document.getElementById('progressFill').style.width = ((currentIdx) / total * 100) + '%';
+}
+ 
+function showFeedback(text, type) {
+  const el = document.getElementById('feedback');
+  el.textContent = text;
+  el.className = 'feedback show ' + type;
+}
+function hideFeedback() {
+  document.getElementById('feedback').className = 'feedback';
+}
+ // ============ 操作 ============
+function setLight(level) {
+  if (!examActive) return;
+  currentLight = level;
+  updateLightDisplay();
+}
+function toggleHazard() {
+  if (!examActive) return;
+  currentHazard = !currentHazard;
+  updateLightDisplay();
+}
+ 
+// ============ 倒计时 ============
+function startCountdown() {
+  countdownValue = 5;
+  const el = document.getElementById('countdownNum');
+  el.textContent = countdownValue;
+  el.className = 'countdown-num';
+ 
+  if (countdownTimer) clearInterval(countdownTimer);
+  countdownTimer = setInterval(() => {
+    countdownValue--;
+    el.textContent = Math.max(0, countdownValue);
+    if (countdownValue <= 3 && countdownValue > 1) el.className = 'countdown-num warning';
+    if (countdownValue <= 1) el.className = 'countdown-num danger';
+    if (countdownValue <= 0) {
+      clearInterval(countdownTimer);
+      countdownTimer = null;
+      onTimeout();
+    }
+  }, 1000);
+}
+function stopCountdown() {
+  if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+}
+ 
+// ============ 判题 ============
+function checkAnswer(q) {
+  const correct = q.answer;
+  const okLight = currentLight === correct.light;
+  const okHazard = currentHazard === correct.hazard;
+  return okLight && okHazard;
+}
+ 
+function answerText(q) {
+  const lightLabels = ['关闭 (0档)', '示廓灯 (1档)', '近光灯 (2档)', '远光灯 (3档)'];
+  return lightLabels[q.answer.light] + (q.answer.hazard ? ' + 双闪开启' : '');
+}
+ 
+function submitAnswer() {
+  if (!examActive) return;
+  finishQuestion(false);
+}
+ 
+function onTimeout() {
+  if (!examActive) return;
+  finishQuestion(true);
+}
+ 
+function finishQuestion(isTimeout) {
+  if (!examActive) return;
+  examActive = false;
+  stopCountdown();
+ 
+  const q = examQuestions[currentIdx];
+  const correct = checkAnswer(q);
+  const timedOut = isTimeout && !correct;
+ 
+  let passThis;
+  if (timedOut) {
+    passThis = false;
+    showFeedback(`⏱ 超时！正确答案：${answerText(q)}`, 'timeout');
+  } else if (correct) {
+    passThis = true;
+    showFeedback('✓ 回答正确！', 'correct');
+  } else {
+    passThis = false;
+    showFeedback(`✗ 回答错误！正确答案：${answerText(q)}，你的答案：${(() => {
+      const labels = ['关闭','示廓灯','近光灯','远光灯'];
+      return labels[currentLight] + (currentHazard ? '+双闪' : '');
+    })()}`, 'wrong');
+  }
+ 
+  if (passThis) passCount++; else failCount++;
+  results.push({
+    id: q.id,
+    text: q.text,
+    pass: passThis,
+    correct: answerText(q)
+  });
+ 
+  document.getElementById('scoreText').textContent = `✓ ${passCount} / ✗ ${failCount}`;
+ 
+  // 锁定按钮
+  document.querySelectorAll('.btn').forEach(b => b.disabled = true);
+ 
+  // 2秒后进入下一题或结束
+  if (autoNextTimer) clearTimeout(autoNextTimer);
+  autoNextTimer = setTimeout(() => {
+    currentIdx++;
+    if (currentIdx >= examQuestions.length) {
+      finishExam();
+    } else {
+      startQuestion();
+    }
+  }, 1800);
+}
+ 
+// ============ 题目流转 ============
+function startQuestion() {
+  hideFeedback();
+  // 解锁按钮
+  document.querySelectorAll('.btn').forEach(b => b.disabled = false);
+ 
+  const q = examQuestions[currentIdx];
+  document.getElementById('qContent').textContent = q.text;
+  updateProgress();
+  examActive = true;
+ 
+  // 每次新题目时将灯光重置？根据真实考试，灯光状态是保留的，这里保留上一题状态
+  // 但用户如果需要切换需要操作。我们保留延续性，但第一题开始前初始为关闭
+ 
+  // 先播放音频，播放完毕后开始倒计时
+  playAudio(q.id, q.text, () => {
+    if (examActive) startCountdown();
+  });
+}
+ 
+// ============ 模式选择 ============
+function showModeScreen() {
+  stopCountdown();
+  stopCoachTimer();
+  stopAudio();
+  examActive = false;
+  currentMode = null;
+
+  document.getElementById('modeScreen').style.display = 'block';
+  document.getElementById('startScreen').style.display = 'none';
+  document.getElementById('examScreen').style.display = 'none';
+  document.getElementById('coachScreen').style.display = 'none';
+  document.getElementById('resultScreen').style.display = 'none';
+  document.getElementById('headerSubtitle').textContent = '请选择模式开始';
+}
+
+function selectMode(mode) {
+  currentMode = mode;
+  document.getElementById('modeScreen').style.display = 'none';
+  if (mode === 'student') {
+    document.getElementById('startScreen').style.display = 'block';
+    document.getElementById('headerSubtitle').textContent = '请在播报后5秒内完成灯光操作';
+  } else if (mode === 'coach') {
+    document.getElementById('coachScreen').style.display = 'block';
+    document.getElementById('headerSubtitle').textContent = '教练演示模式 — 自动播报所有题目';
+    startCoachMode();
+  }
+}
+
+// ============ 学员模式 - 开始 / 结束考试 ============
+function startExam() {
+  examQuestions = buildExamQuestions();
+  currentIdx = 0;
+  currentLight = 0;
+  currentHazard = false;
+  passCount = 0;
+  failCount = 0;
+  results = [];
+
+  document.getElementById('startScreen').style.display = 'none';
+  document.getElementById('resultScreen').style.display = 'none';
+  document.getElementById('examScreen').style.display = 'block';
+
+  updateLightDisplay();
+  updateProgress();
+  document.getElementById('progressFill').style.width = '0%';
+
+  startQuestion();
+}
+
+function finishExam() {
+  stopCountdown();
+  stopAudio();
+  examActive = false;
+  const total = examQuestions.length;
+  const score = Math.round(passCount / total * 100);
+
+  document.getElementById('examScreen').style.display = 'none';
+  document.getElementById('resultScreen').style.display = 'block';
+
+  // 显示成绩区域
+  document.querySelector('.score-count').style.display = 'block';
+  document.getElementById('restartBtn').textContent = '重新考试';
+
+  document.getElementById('resultScore').textContent = score;
+  document.getElementById('passCount').textContent = `正确：${passCount} 题`;
+  document.getElementById('failCount').textContent = `错误：${failCount} 题`;
+
+  if (score >= 90) {
+    document.getElementById('resultEmoji').textContent = '🎉';
+    document.getElementById('resultTitle').textContent = '优秀，模拟通过！';
+    document.getElementById('resultSubtitle').textContent = '分 — 继续保持，考试必过';
+  } else if (score >= 70) {
+    document.getElementById('resultEmoji').textContent = '💪';
+    document.getElementById('resultTitle').textContent = '还需努力！';
+    document.getElementById('resultSubtitle').textContent = '分 — 建议多练习几次';
+  } else {
+    document.getElementById('resultEmoji').textContent = '📖';
+    document.getElementById('resultTitle').textContent = '需要加强练习！';
+    document.getElementById('resultSubtitle').textContent = '分 — 重新梳理灯光操作逻辑';
+  }
+
+  const detail = document.getElementById('resultDetail');
+  detail.innerHTML = results.map((r, i) => `
+    <div class="result-row">
+      <span class="q">${i+1}. ${r.text}</span>
+      <span class="${r.pass ? 'mark-pass' : 'mark-fail'}">${r.pass ? '✓ 对' : '✗ 错'}</span>
+    </div>
+  `).join('');
+}
+
+function restartExam() {
+  stopCountdown();
+  stopCoachTimer();
+  stopAudio();
+  if (currentMode === 'coach') {
+    startCoachMode();
+  } else {
+    startExam();
+  }
+}
+
+// ============ 教练模式 ============
+function startCoachMode() {
+  examQuestions = buildExamQuestions();
+  currentIdx = 0;
+  coachAutoPlay = true;
+  updateCoachAutoBtn();
+  document.getElementById('coachScreen').style.display = 'block';
+  document.getElementById('resultScreen').style.display = 'none';
+  coachShowQuestion();
+}
+
+function coachShowQuestion() {
+  stopCoachTimer();
+  stopAudio();
+
+  if (currentIdx < 0) currentIdx = 0;
+  if (currentIdx >= examQuestions.length) {
+    finishCoachMode();
+    return;
+  }
+
+  const q = examQuestions[currentIdx];
+  document.getElementById('coachQContent').textContent = q.text;
+  document.getElementById('coachQNum').textContent = currentIdx + 1;
+  document.getElementById('coachQIndex').textContent = `第 ${currentIdx + 1} / ${examQuestions.length} 题`;
+  document.getElementById('coachProgressFill').style.width = (currentIdx / examQuestions.length * 100) + '%';
+  document.getElementById('coachAnswerText').textContent = answerText(q);
+  document.getElementById('coachBtnPrev').disabled = (currentIdx === 0);
+
+  // 播放音频，播放完毕后开始5秒倒计时（自动模式下）
+  playAudio(q.id, q.text, () => {
+    if (coachAutoPlay && currentIdx < examQuestions.length) {
+      coachStartCountdown();
+    }
+  });
+
+  // 手动模式下显示提示
+  if (!coachAutoPlay) {
+    document.getElementById('coachTimerText').textContent = '手动模式 — 点击"下一题"继续';
+  }
+}
+
+function coachStartCountdown() {
+  coachCountdownValue = 5;
+  document.getElementById('coachTimerText').textContent = `${coachCountdownValue} 秒后下一题`;
+
+  if (coachTimer) clearInterval(coachTimer);
+  coachTimer = setInterval(() => {
+    coachCountdownValue--;
+    document.getElementById('coachTimerText').textContent = `${Math.max(0, coachCountdownValue)} 秒后下一题`;
+    if (coachCountdownValue <= 0) {
+      clearInterval(coachTimer);
+      coachTimer = null;
+      coachManualNext();
+    }
+  }, 1000);
+}
+
+// 手动下一题（自动模式下也生效，并维持自动状态）
+function coachManualNext() {
+  currentIdx++;
+  coachShowQuestion();
+}
+
+// 上一题（可连续点击）
+function coachPrev() {
+  if (currentIdx > 0) {
+    currentIdx--;
+    coachShowQuestion();
+  }
+}
+
+// 切换自动/手动模式
+function coachToggleAuto() {
+  coachAutoPlay = !coachAutoPlay;
+  updateCoachAutoBtn();
+  if (coachAutoPlay) {
+    // 恢复自动：如果当前没有在倒计时，启动倒计时
+    if (!coachTimer && currentIdx < examQuestions.length) {
+      coachStartCountdown();
+    }
+  } else {
+    // 暂停自动：停止倒计时
+    stopCoachTimer();
+    document.getElementById('coachTimerText').textContent = '手动模式 — 点击"下一题"继续';
+  }
+}
+
+function updateCoachAutoBtn() {
+  const btn = document.getElementById('coachBtnAuto');
+  if (coachAutoPlay) {
+    btn.textContent = '⏸ 暂停自动';
+    btn.classList.remove('paused');
+  } else {
+    btn.textContent = '▶ 开启自动';
+    btn.classList.add('paused');
+  }
+}
+
+// 中途重新开始教练模式
+function coachRestart() {
+  stopCoachTimer();
+  stopAudio();
+  startCoachMode();
+}
+
+function coachRepeatVoice() {
+  if (examQuestions[currentIdx]) {
+    // 重新播报后，如果是自动模式，重新开始5秒倒计时
+    playAudio(examQuestions[currentIdx].id, examQuestions[currentIdx].text, () => {
+      if (coachAutoPlay && currentIdx < examQuestions.length) {
+        coachStartCountdown();
+      }
+    });
+  }
+}
+
+function stopCoachTimer() {
+  if (coachTimer) { clearInterval(coachTimer); coachTimer = null; }
+}
+
+function finishCoachMode() {
+  stopCoachTimer();
+  stopAudio();
+
+  document.getElementById('coachScreen').style.display = 'none';
+  document.getElementById('resultScreen').style.display = 'block';
+
+  // 教练模式不显示成绩
+  document.querySelector('.score-count').style.display = 'none';
+  document.getElementById('restartBtn').textContent = '重新演示';
+
+  document.getElementById('resultEmoji').textContent = '✅';
+  document.getElementById('resultTitle').textContent = '演示完成！';
+  document.getElementById('resultScore').textContent = '15';
+  document.getElementById('resultSubtitle').textContent = '已播报全部 15 道题';
+
+  const detail = document.getElementById('resultDetail');
+  detail.innerHTML = examQuestions.map((q, i) => `
+    <div class="result-row">
+      <span class="q">${i+1}. ${q.text}</span>
+      <span class="mark-pass">${answerText(q)}</span>
+    </div>
+  `).join('');
+}
+
+// 初始化显示
+updateLightDisplay();
+</script>
+</body>
+</html>
