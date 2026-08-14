@@ -496,7 +496,7 @@ body {
 // ============ 题目数据 ============
 const FIXED_FIRST = {
   id: 1,
-  text: '请开启前照灯(近光灯)',
+  text: '请根据播报的驾驶场景，在播报后5秒内完成灯光操作。请开启前照灯',
   answer: { light: 2, hazard: false }
 };
  
@@ -516,8 +516,8 @@ const MIDDLE_QUESTIONS = [
 ];
  
 const FIXED_LAST_TWO = [
-  { id: 14, text: '请靠边停车（关闭一档近光灯到示廓灯，开启双闪）', answer: { light: 1, hazard: true } },
-  { id: 15, text: '夜间灯光结束，请关闭所有灯光',                     answer: { light: 0, hazard: false } }
+  { id: 14, text: '请靠边停车',                               answer: { light: 1, hazard: true } },
+  { id: 15, text: '夜间灯光结束，请关闭所有灯光',             answer: { light: 0, hazard: false } }
 ];
  
 // ============ 状态 ============
