@@ -245,33 +245,116 @@ body {
 }
 .score-count .pass { color: #64ffda; font-weight: bold; }
 .score-count .fail { color: #ff6b6b; font-weight: bold; }
+
+/* 模式选择 */
+.mode-cards { display: flex; flex-direction: column; gap: 16px; }
+.mode-card {
+  background: rgba(255,255,255,0.05);
+  border: 2px solid rgba(255,255,255,0.1);
+  border-radius: 16px;
+  padding: 24px 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+.mode-card:active { transform: scale(0.97); }
+.mode-card .mode-icon { font-size: 48px; margin-bottom: 12px; }
+.mode-card .mode-title { font-size: 18px; font-weight: bold; margin-bottom: 6px; }
+.mode-card .mode-desc { font-size: 13px; color: #8892b0; line-height: 1.6; }
+.mode-card.student { border-color: rgba(108,92,231,0.5); }
+.mode-card.student .mode-title { color: #a29bfe; }
+.mode-card.coach { border-color: rgba(255,215,0,0.4); }
+.mode-card.coach .mode-title { color: #ffd700; }
+
+/* 教练模式 */
+.coach-answer-box {
+  background: rgba(100,255,218,0.1);
+  border: 1px solid rgba(100,255,218,0.3);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+.coach-answer-label {
+  font-size: 12px;
+  color: #64ffda;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+.coach-answer-text {
+  font-size: 18px;
+  font-weight: bold;
+  color: #e6f1ff;
+}
+.coach-timer-box {
+  text-align: center;
+  margin-top: 12px;
+}
+.coach-timer-text {
+  font-size: 14px;
+  color: #8892b0;
+  padding: 8px 16px;
+  background: rgba(0,0,0,0.2);
+  border-radius: 20px;
+  display: inline-block;
+}
+.back-btn {
+  width: 100%;
+  padding: 14px;
+  font-size: 15px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 14px;
+  color: #8892b0;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 10px;
+}
+.back-btn:active { transform: scale(0.97); }
 </style>
 </head>
 <body>
 <div class="container">
   <div class="header">
     <h1>🚗 夜间灯光模拟考试</h1>
-    <p>请在播报后5秒内完成灯光操作</p>
+    <p id="headerSubtitle">请选择模式开始</p>
   </div>
- 
-  <!-- 开始界面 -->
-  <div id="startScreen" class="panel">
+
+  <!-- 模式选择界面 -->
+  <div id="modeScreen" class="panel">
+    <div class="mode-cards">
+      <div class="mode-card student" onclick="selectMode('student')">
+        <div class="mode-icon">🎓</div>
+        <div class="mode-title">学员模式</div>
+        <div class="mode-desc">模拟考试，5秒内完成灯光操作<br>共 15 道题，自动评分</div>
+      </div>
+      <div class="mode-card coach" onclick="selectMode('coach')">
+        <div class="mode-icon">👨‍🏫</div>
+        <div class="mode-title">教练模式</div>
+        <div class="mode-desc">自动播报题目和答案<br>每题间隔 6 秒，适合演示教学</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 学员模式 - 开始界面 -->
+  <div id="startScreen" class="panel" style="display:none;">
     <div style="text-align:center; padding: 10px 0;">
       <div style="font-size: 56px; margin-bottom: 16px;">💡</div>
       <p style="color:#ccd6f6; line-height:1.8; font-size:14px; margin-bottom:20px;">
-        共 11 道题<br>
+        共 15 道题<br>
         请根据语音播报内容<br>
         在 5 秒内完成对应灯光操作
       </p>
       <button class="start-btn" onclick="startExam()">开始考试</button>
-          </div>
+      <button class="back-btn" onclick="showModeScreen()">返回选择模式</button>
+    </div>
   </div>
  
   <!-- 考试界面 -->
   <div id="examScreen" style="display:none;">
     <div class="panel">
       <div class="progress-info">
-        <span id="qIndex">第 1 / 11 题</span>
+        <span id="qIndex">第 1 / 15 题</span>
         <span id="scoreText">✓ 0 / ✗ 0</span>
       </div>
       <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
@@ -326,7 +409,38 @@ body {
  
     <div class="feedback" id="feedback"></div>
   </div>
- 
+
+  <!-- 教练模式界面 -->
+  <div id="coachScreen" style="display:none;">
+    <div class="panel">
+      <div class="progress-info">
+        <span id="coachQIndex">第 1 / 15 题</span>
+        <span style="color:#ffd700;">教练演示模式</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="coachProgressFill"></div></div>
+
+      <div class="question-box">
+        <div class="question-text">
+          <span class="q-num" id="coachQNum">1</span>
+          <span id="coachQContent">准备开始...</span>
+        </div>
+      </div>
+
+      <div class="coach-answer-box">
+        <div class="coach-answer-label">✓ 正确答案</div>
+        <div class="coach-answer-text" id="coachAnswerText">-</div>
+      </div>
+
+      <div style="text-align:center;">
+        <button class="speaker-btn" onclick="coachRepeatVoice()">🔊 重新播报</button>
+      </div>
+
+      <div class="coach-timer-box">
+        <div class="coach-timer-text" id="coachTimerText">6 秒后下一题</div>
+      </div>
+    </div>
+  </div>
+
   <!-- 结果界面 -->
   <div id="resultScreen" style="display:none;">
     <div class="panel result-screen">
@@ -340,7 +454,8 @@ body {
         <span class="fail" id="failCount">错误：0 题</span>
       </div>
       <div class="result-detail" id="resultDetail"></div>
-      <button class="restart-btn" onclick="restartExam()">重新考试</button>
+      <button class="restart-btn" id="restartBtn" onclick="restartExam()">重新考试</button>
+      <button class="back-btn" onclick="showModeScreen()">返回选择模式</button>
     </div>
   </div>
 </div>
@@ -385,6 +500,10 @@ let countdownTimer = null;
 let countdownValue = 0;
 let examActive = false;
 let autoNextTimer = null;
+let currentMode = null;    // 'student' 或 'coach'
+let coachTimer = null;
+let coachCountdownValue = 0;
+let audioElement = null;   // 音频播放器
  
 // ============ 工具函数 ============
 function shuffle(arr) {
@@ -397,11 +516,35 @@ function shuffle(arr) {
 }
  
 function buildExamQuestions() {
-  const middle = shuffle(MIDDLE_QUESTIONS).slice(0, 9);
-  return [FIXED_FIRST, ...middle, ...FIXED_LAST_TWO];
+  // 出全部 15 道题：第1题固定 + 中间12题全部 + 最后2题固定
+  return [FIXED_FIRST, ...MIDDLE_QUESTIONS, ...FIXED_LAST_TWO];
 }
  
 // ============ 语音播报 ============
+// 尝试播放音频文件，不存在则回退到语音合成
+function playAudio(qid, text) {
+  // 停止当前播放
+  stopAudio();
+  const audioPath = `audio/${qid}.mp3`;
+  audioElement = new Audio(audioPath);
+  audioElement.onerror = () => {
+    // 音频文件不存在，回退到语音合成
+    speak(text);
+  };
+  audioElement.play().catch(() => {
+    // 播放失败，回退到语音合成
+    speak(text);
+  });
+}
+
+function stopAudio() {
+  if (audioElement) {
+    audioElement.pause();
+    audioElement = null;
+  }
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
+}
+
 function speak(text) {
   if (!('speechSynthesis' in window)) return;
   try {
@@ -413,8 +556,11 @@ function speak(text) {
     window.speechSynthesis.speak(u);
   } catch(e) {}
 }
+
 function repeatVoice() {
-  if (examQuestions[currentIdx]) speak(examQuestions[currentIdx].text);
+  if (examQuestions[currentIdx]) {
+    playAudio(examQuestions[currentIdx].id, examQuestions[currentIdx].text);
+  }
 }
  
 // ============ UI 更新 ============
@@ -574,17 +720,45 @@ function startQuestion() {
   // 每次新题目时将灯光重置？根据真实考试，灯光状态是保留的，这里保留上一题状态
   // 但用户如果需要切换需要操作。我们保留延续性，但第一题开始前初始为关闭
  
-  // 先播报
-  speak(q.text);
+  // 先播报（优先播放音频文件，无音频时回退语音合成）
+  playAudio(q.id, q.text);
   // 播报稍作延迟后开始倒计时（让用户听题）
   setTimeout(() => {
     startCountdown();
   }, 500);
 }
  
-// ============ 开始 / 结束考试 ============
+// ============ 模式选择 ============
+function showModeScreen() {
+  stopCountdown();
+  stopCoachTimer();
+  stopAudio();
+  examActive = false;
+  currentMode = null;
+
+  document.getElementById('modeScreen').style.display = 'block';
+  document.getElementById('startScreen').style.display = 'none';
+  document.getElementById('examScreen').style.display = 'none';
+  document.getElementById('coachScreen').style.display = 'none';
+  document.getElementById('resultScreen').style.display = 'none';
+  document.getElementById('headerSubtitle').textContent = '请选择模式开始';
+}
+
+function selectMode(mode) {
+  currentMode = mode;
+  document.getElementById('modeScreen').style.display = 'none';
+  if (mode === 'student') {
+    document.getElementById('startScreen').style.display = 'block';
+    document.getElementById('headerSubtitle').textContent = '请在播报后5秒内完成灯光操作';
+  } else if (mode === 'coach') {
+    document.getElementById('coachScreen').style.display = 'block';
+    document.getElementById('headerSubtitle').textContent = '教练演示模式 — 自动播报所有题目';
+    startCoachMode();
+  }
+}
+
+// ============ 学员模式 - 开始 / 结束考试 ============
 function startExam() {
-  // 初始化
   examQuestions = buildExamQuestions();
   currentIdx = 0;
   currentLight = 0;
@@ -592,31 +766,36 @@ function startExam() {
   passCount = 0;
   failCount = 0;
   results = [];
- 
+
   document.getElementById('startScreen').style.display = 'none';
   document.getElementById('resultScreen').style.display = 'none';
   document.getElementById('examScreen').style.display = 'block';
- 
+
   updateLightDisplay();
   updateProgress();
   document.getElementById('progressFill').style.width = '0%';
- 
+
   startQuestion();
 }
- 
+
 function finishExam() {
   stopCountdown();
+  stopAudio();
   examActive = false;
   const total = examQuestions.length;
   const score = Math.round(passCount / total * 100);
- 
+
   document.getElementById('examScreen').style.display = 'none';
   document.getElementById('resultScreen').style.display = 'block';
- 
+
+  // 显示成绩区域
+  document.querySelector('.score-count').style.display = 'block';
+  document.getElementById('restartBtn').textContent = '重新考试';
+
   document.getElementById('resultScore').textContent = score;
   document.getElementById('passCount').textContent = `正确：${passCount} 题`;
   document.getElementById('failCount').textContent = `错误：${failCount} 题`;
- 
+
   if (score >= 90) {
     document.getElementById('resultEmoji').textContent = '🎉';
     document.getElementById('resultTitle').textContent = '优秀，模拟通过！';
@@ -630,7 +809,7 @@ function finishExam() {
     document.getElementById('resultTitle').textContent = '需要加强练习！';
     document.getElementById('resultSubtitle').textContent = '分 — 重新梳理灯光操作逻辑';
   }
- 
+
   const detail = document.getElementById('resultDetail');
   detail.innerHTML = results.map((r, i) => `
     <div class="result-row">
@@ -639,14 +818,95 @@ function finishExam() {
     </div>
   `).join('');
 }
- 
+
 function restartExam() {
-  if (countdownTimer) clearInterval(countdownTimer);
-  if (autoNextTimer) clearTimeout(autoNextTimer);
-  window.speechSynthesis && window.speechSynthesis.cancel();
-  startExam();
+  stopCountdown();
+  stopCoachTimer();
+  stopAudio();
+  if (currentMode === 'coach') {
+    startCoachMode();
+  } else {
+    startExam();
+  }
 }
- 
+
+// ============ 教练模式 ============
+function startCoachMode() {
+  examQuestions = buildExamQuestions();
+  currentIdx = 0;
+  document.getElementById('coachScreen').style.display = 'block';
+  document.getElementById('resultScreen').style.display = 'none';
+  coachNextQuestion();
+}
+
+function coachNextQuestion() {
+  if (currentIdx >= examQuestions.length) {
+    finishCoachMode();
+    return;
+  }
+
+  const q = examQuestions[currentIdx];
+  document.getElementById('coachQContent').textContent = q.text;
+  document.getElementById('coachQNum').textContent = currentIdx + 1;
+  document.getElementById('coachQIndex').textContent = `第 ${currentIdx + 1} / ${examQuestions.length} 题`;
+  document.getElementById('coachProgressFill').style.width = (currentIdx / examQuestions.length * 100) + '%';
+  document.getElementById('coachAnswerText').textContent = answerText(q);
+
+  // 播放音频
+  playAudio(q.id, q.text);
+
+  // 6秒后下一题
+  coachCountdownValue = 6;
+  document.getElementById('coachTimerText').textContent = `${coachCountdownValue} 秒后下一题`;
+
+  if (coachTimer) clearInterval(coachTimer);
+  coachTimer = setInterval(() => {
+    coachCountdownValue--;
+    document.getElementById('coachTimerText').textContent = `${Math.max(0, coachCountdownValue)} 秒后下一题`;
+    if (coachCountdownValue <= 0) {
+      clearInterval(coachTimer);
+      coachTimer = null;
+      currentIdx++;
+      coachNextQuestion();
+    }
+  }, 1000);
+}
+
+function coachRepeatVoice() {
+  if (examQuestions[currentIdx]) {
+    playAudio(examQuestions[currentIdx].id, examQuestions[currentIdx].text);
+  }
+}
+
+function stopCoachTimer() {
+  if (coachTimer) { clearInterval(coachTimer); coachTimer = null; }
+}
+
+function finishCoachMode() {
+  stopCoachTimer();
+  stopAudio();
+
+  document.getElementById('coachScreen').style.display = 'none';
+  document.getElementById('resultScreen').style.display = 'block';
+
+  // 教练模式不显示成绩
+  document.querySelector('.score-count').style.display = 'none';
+  document.getElementById('restartBtn').textContent = '重新演示';
+
+  document.getElementById('resultEmoji').textContent = '✅';
+  document.getElementById('resultTitle').textContent = '演示完成！';
+  document.getElementById('resultScore').textContent = '15';
+  document.getElementById('resultSubtitle').textContent = '已播报全部 15 道题';
+
+  const detail = document.getElementById('resultDetail');
+  detail.innerHTML = examQuestions.map((q, i) => `
+    <div class="result-row">
+      <span class="q">${i+1}. ${q.text}</span>
+      <span class="mark-pass">${answerText(q)}</span>
+    </div>
+  `).join('');
+}
+
 // 初始化显示
 updateLightDisplay();
 </script>
