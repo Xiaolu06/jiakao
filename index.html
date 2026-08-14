@@ -570,9 +570,10 @@ function buildExamQuestions() {
 // ============ 语音播报 ============
 // 尝试播放音频文件（优先使用预加载对象），不存在则回退到语音合成，播放完毕后调用 onEnd 回调
 function playAudio(qid, text, onEnd) {
-  // 新会话，之前的任何回调失效
-  const mySession = ++audioSession;
+  // 先停止当前播放（stopAudio 内部会 audioSession++）
   stopAudio();
+  // 再取新会话 id，确保 mySession === audioSession
+  const mySession = ++audioSession;
 
   let fallbackDone = false;
   const safeEnd = () => {
