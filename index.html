@@ -349,12 +349,12 @@ body {
       <div class="mode-card student" onclick="selectMode('student')">
         <div class="mode-icon">🎓</div>
         <div class="mode-title">学员模式</div>
-        <div class="mode-desc">模拟考试，5秒内完成灯光操作<br>共 15 道题，自动评分</div>
+        <div class="mode-desc">模拟考试，播报后 7 秒内完成灯光操作<br>共 15 道题，自动评分</div>
       </div>
       <div class="mode-card coach" onclick="selectMode('coach')">
         <div class="mode-icon">👨‍🏫</div>
         <div class="mode-title">教练模式</div>
-        <div class="mode-desc">自动播报题目和答案<br>每题间隔 6 秒，适合演示教学</div>
+        <div class="mode-desc">自动播报题目和答案<br>播报后 7 秒自动下一题，适合演示教学</div>
       </div>
     </div>
   </div>
@@ -366,7 +366,7 @@ body {
       <p style="color:#ccd6f6; line-height:1.8; font-size:14px; margin-bottom:20px;">
         共 15 道题<br>
         请根据语音播报内容<br>
-        在 5 秒内完成对应灯光操作
+        在 7 秒内完成对应灯光操作
       </p>
       <button class="start-btn" onclick="startExam()">开始考试</button>
       <button class="back-btn" onclick="showModeScreen()">返回选择模式</button>
@@ -383,7 +383,7 @@ body {
       <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
  
       <div class="countdown-box">
-        <div class="countdown-num" id="countdownNum">5</div>
+        <div class="countdown-num" id="countdownNum">7</div>
         <div class="countdown-label">剩余操作时间（秒）</div>
       </div>
  
@@ -459,7 +459,7 @@ body {
       </div>
 
       <div class="coach-timer-box">
-        <div class="coach-timer-text" id="coachTimerText">5 秒后下一题</div>
+        <div class="coach-timer-text" id="coachTimerText">7 秒后下一题</div>
       </div>
 
       <div class="coach-controls">
@@ -536,6 +536,7 @@ let currentMode = null;    // 'student' 或 'coach'
 let coachTimer = null;
 let coachCountdownValue = 0;
 let audioElement = null;   // 当前音频播放器
+let audioSession = 0;      // 音频会话 id：每次新的播放/停止都会递增，旧会话的回调自动失效，防止串题
 let audioUnlocked = false; // 用户手势内是否解锁过自动播放
 // 音频预加载池（同时作为"解锁播放"时可复用的 Audio 引用，避免频繁 new）
 const audioPreloadPool = {};
@@ -591,70 +592,63 @@ function buildExamQuestions() {
  
 // ============ 语音播报 ============
 function playAudio(qid, text, onEnd) {
-  // 停止之前的音频
+  // 停止之前的音频，并让旧会话的回调全部失效
   stopAudio();
+  const mySession = ++audioSession;
 
-  // 直接复用预加载池中的 Audio 对象
+  let ended = false;
+  let fallbackTimer = null;
+  const safeEnd = () => {
+    if (ended) return;
+    ended = true;
+    if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+    // 只清理当前播放的引用，避免误删下一个会话的 audioElement
+    if (audioElement === audio) audioElement = null;
+    // 仅当仍是最新会话时才触发 onEnd（防串题）
+    if (mySession === audioSession && onEnd) {
+      try { onEnd(); } catch(e) {}
+    }
+  };
+
+  // 兜底：正常情况下音频播完会触发 onended，这里防止任何异常导致流程卡死
+  fallbackTimer = setTimeout(safeEnd, 15000);
+
+  // 直接复用预加载池中的 Audio 对象（已预加载、已解锁，点击后即时出声）
   let audio = audioPreloadPool[qid];
   if (!audio) {
     audio = new Audio('audio/' + qid + '.mp3');
     audio.preload = 'auto';
     audioPreloadPool[qid] = audio;
   }
-  audioElement = audio;
 
-  // 确保 onEnd 只被调用一次
-  let called = false;
-  let timeoutId = null;
-  const safeOnEnd = () => {
-    if (called) return;
-    called = true;
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-      timeoutId = null;
-    }
-    if (onEnd) {
-      try { onEnd(); } catch(e) {}
-    }
-  };
-
-  // 先清掉旧的监听器
+  // 先清掉旧监听器，再绑定新监听器
   audio.onended = null;
   audio.onerror = null;
-  // 绑新监听器
-  audio.onended = safeOnEnd;
-  audio.onerror = () => {
-    // 音频加载或播放出错，仍然要触发 onEnd 让流程继续
-    safeOnEnd();
-  };
+  audio.onended = safeEnd;
+  audio.onerror = () => { safeEnd(); };
 
   // 保证从头播放
   try {
     if (audio.readyState >= 1) audio.currentTime = 0;
   } catch(e) {}
 
-  let playStarted = false;
+  audioElement = audio;
   try {
     const playPromise = audio.play();
     if (playPromise !== undefined && typeof playPromise.then === 'function') {
-      playPromise
-        .then(() => { playStarted = true; })
-        .catch((err) => {
-          // 自动播放被阻止 → 触发 onEnd 避免流程卡死
-          safeOnEnd();
-        });
-    } else {
-      playStarted = true;
+      playPromise.catch(() => {
+        // 播放被中断（切下一题）或被浏览器阻止 → 不阻塞考试流程
+        safeEnd();
+      });
     }
   } catch(e) {
-    safeOnEnd();
+    safeEnd();
   }
-
-  // 超时兜底：10 秒后强制触发 onEnd，防止任何异常情况永久卡住
-  timeoutId = setTimeout(safeOnEnd, 10000);
 }
 
 function stopAudio() {
+  // 递增会话 id：旧音频的回调（onended/onerror/play 拒绝）全部失效
+  audioSession++;
   if (audioElement) {
     try { audioElement.pause(); } catch(e) {}
     // 监听器也清掉，避免保留的回调稍后触发
@@ -724,7 +718,7 @@ function startCountdown() {
     clearInterval(countdownTimer);
     countdownTimer = null;
   }
-  countdownValue = 5;
+  countdownValue = 7;
   const el = document.getElementById('countdownNum');
   el.textContent = countdownValue;
   el.className = 'countdown-num';
@@ -860,7 +854,7 @@ function selectMode(mode) {
   document.getElementById('modeScreen').style.display = 'none';
   if (mode === 'student') {
     document.getElementById('startScreen').style.display = 'block';
-    document.getElementById('headerSubtitle').textContent = '请在播报后5秒内完成灯光操作';
+    document.getElementById('headerSubtitle').textContent = '请在播报后 7 秒内完成灯光操作';
   } else if (mode === 'coach') {
     document.getElementById('coachScreen').style.display = 'block';
     document.getElementById('headerSubtitle').textContent = '教练演示模式 — 自动播报所有题目';
@@ -991,7 +985,7 @@ function coachStartCountdown() {
     clearInterval(coachTimer);
     coachTimer = null;
   }
-  coachCountdownValue = 5;
+  coachCountdownValue = 7;
   document.getElementById('coachTimerText').textContent = `${coachCountdownValue} 秒后下一题`;
 
   coachTimer = setInterval(() => {
