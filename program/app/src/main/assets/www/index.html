@@ -624,26 +624,48 @@ function playAudio(qid, text, onEnd) {
   // 先清掉旧监听器，再绑定新监听器
   audio.onended = null;
   audio.onerror = null;
-  audio.onended = safeEnd;
-  audio.onerror = () => { safeEnd(); };
+  audio.oncanplay = null;
 
-  // 保证从头播放
-  try {
-    if (audio.readyState >= 1) audio.currentTime = 0;
-  } catch(e) {}
-
-  audioElement = audio;
-  try {
-    const playPromise = audio.play();
-    if (playPromise !== undefined && typeof playPromise.then === 'function') {
-      playPromise.catch(() => {
-        // 播放被中断（切下一题）或被浏览器阻止 → 不阻塞考试流程
-        safeEnd();
-      });
+  let retries = 0;
+  const tryPlay = () => {
+    if (mySession !== audioSession || ended) return;
+    // 保证从头播放
+    try {
+      if (audio.readyState >= 1) audio.currentTime = 0;
+    } catch(e) {}
+    try {
+      const playPromise = audio.play();
+      if (playPromise !== undefined && typeof playPromise.then === 'function') {
+        // 播放被拒（首次启动时音频可能尚未就绪）→ 等就绪后重试，而不是直接结束
+        playPromise.catch(() => retryLater());
+      }
+    } catch(e) {
+      retryLater();
     }
-  } catch(e) {
-    safeEnd();
-  }
+  };
+
+  const retryLater = () => {
+    if (mySession !== audioSession || ended) return;
+    if (retries >= 3) { safeEnd(); return; }  // 多次失败才放行，避免流程卡死
+    retries++;
+    if (audio.readyState < 2) {
+      // 音频尚未加载完成：等待 canplay 事件后立即播放
+      audio.oncanplay = () => { audio.oncanplay = null; tryPlay(); };
+      setTimeout(() => {
+        if (mySession === audioSession && !ended && audio.readyState < 2) {
+          audio.oncanplay = null;
+          tryPlay();  // 若 canplay 一直不触发，强行走一遍，仍失败则继续重试
+        }
+      }, 800);
+    } else {
+      setTimeout(tryPlay, 300);
+    }
+  };
+
+  audio.onended = safeEnd;
+  audio.onerror = () => retryLater();  // 出错先重试，而不是直接进入倒计时
+  audioElement = audio;
+  tryPlay();
 }
 
 function stopAudio() {
