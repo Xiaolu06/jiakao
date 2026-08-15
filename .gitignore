@@ -1,0 +1,15 @@
+# Trae 分享包
+.trae-html-share-packages/
+
+# Android 构建产物
+program/build/
+program/.gradle/
+program/.idea/
+*.idsig
+
+# 构建工具链（JDK / Android SDK / Gradle，体积大无需入库）
+program/tools/
+
+# 临时文件
+servercheck.txt
+_build/

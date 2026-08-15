@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 黄色灯泡主体 -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M54,34 a16,16 0 0 1 16,16 c0,7 -3,10 -6,14 l-4,5 c-1,2 -2,3 -6,3 s-5,-1 -6,-3 l-4,-5 c-3,-4 -6,-7 -6,-14 a16,16 0 0 1 16,-16 z" />
+    <!-- 灯座 -->
+    <path
+        android:fillColor="#8892B0"
+        android:pathData="M48,76 l12,0 l2,5 l-16,0 z" />
+    <path
+        android:fillColor="#A29BFE"
+        android:pathData="M50,83 l8,0 l1,4 l-10,0 z" />
+    <!-- 光线 -->
+    <path
+        android:strokeColor="#FFD700"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M54,8 L54,16 M54,92 L54,100 M24,34 L30,39 M78,34 L84,39 M22,64 L30,60 M86,64 L78,60" />
+</vector>
