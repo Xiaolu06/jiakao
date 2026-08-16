@@ -349,12 +349,12 @@ body {
       <div class="mode-card student" onclick="selectMode('student')">
         <div class="mode-icon">🎓</div>
         <div class="mode-title">学员模式</div>
-        <div class="mode-desc">模拟考试，播报后 7 秒内完成灯光操作<br>共 10 道题，自动评分</div>
+        <div class="mode-desc">模拟考试，播报后 5 秒内完成灯光操作<br>共 10 道题，自动评分</div>
       </div>
       <div class="mode-card coach" onclick="selectMode('coach')">
         <div class="mode-icon">👨‍🏫</div>
         <div class="mode-title">教练模式</div>
-        <div class="mode-desc">自动播报题目和答案<br>播报后 7 秒自动下一题，适合演示教学</div>
+        <div class="mode-desc">自动播报题目和答案<br>播报后 5 秒自动下一题，适合演示教学</div>
       </div>
     </div>
   </div>
@@ -366,7 +366,7 @@ body {
       <p style="color:#ccd6f6; line-height:1.8; font-size:14px; margin-bottom:20px;">
         共 10 道题<br>
         请根据语音播报内容<br>
-        在 7 秒内完成对应灯光操作
+        在 5 秒内完成对应灯光操作
       </p>
       <button class="start-btn" onclick="startExam()">开始考试</button>
       <button class="back-btn" onclick="showModeScreen()">返回选择模式</button>
@@ -459,7 +459,7 @@ body {
       </div>
 
       <div class="coach-timer-box">
-        <div class="coach-timer-text" id="coachTimerText">7 秒后下一题</div>
+        <div class="coach-timer-text" id="coachTimerText">5 秒后下一题</div>
       </div>
 
       <div class="coach-controls">
@@ -759,7 +759,7 @@ function startCountdown() {
     clearInterval(countdownTimer);
     countdownTimer = null;
   }
-  countdownValue = 7;
+  countdownValue = 5;
   const el = document.getElementById('countdownNum');
   el.textContent = countdownValue;
   el.className = 'countdown-num';
@@ -906,7 +906,7 @@ function selectMode(mode) {
   document.getElementById('modeScreen').style.display = 'none';
   if (mode === 'student') {
     document.getElementById('startScreen').style.display = 'block';
-    document.getElementById('headerSubtitle').textContent = '请在播报后 7 秒内完成灯光操作';
+    document.getElementById('headerSubtitle').textContent = '请在播报后 5 秒内完成灯光操作';
   } else if (mode === 'coach') {
     document.getElementById('coachScreen').style.display = 'block';
     document.getElementById('headerSubtitle').textContent = '教练演示模式 — 自动播报所有题目';
@@ -1042,7 +1042,7 @@ function coachStartCountdown() {
     clearInterval(coachTimer);
     coachTimer = null;
   }
-  coachCountdownValue = 7;
+  coachCountdownValue = 5;
   document.getElementById('coachTimerText').textContent = `${coachCountdownValue} 秒后下一题`;
 
   coachTimer = setInterval(() => {
