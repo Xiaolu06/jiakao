@@ -349,7 +349,7 @@ body {
       <div class="mode-card student" onclick="selectMode('student')">
         <div class="mode-icon">🎓</div>
         <div class="mode-title">学员模式</div>
-        <div class="mode-desc">模拟考试，播报后 7 秒内完成灯光操作<br>共 15 道题，自动评分</div>
+        <div class="mode-desc">模拟考试，播报后 7 秒内完成灯光操作<br>共 10 道题，自动评分</div>
       </div>
       <div class="mode-card coach" onclick="selectMode('coach')">
         <div class="mode-icon">👨‍🏫</div>
@@ -364,7 +364,7 @@ body {
     <div style="text-align:center; padding: 10px 0;">
       <div style="font-size: 56px; margin-bottom: 16px;">💡</div>
       <p style="color:#ccd6f6; line-height:1.8; font-size:14px; margin-bottom:20px;">
-        共 15 道题<br>
+        共 10 道题<br>
         请根据语音播报内容<br>
         在 7 秒内完成对应灯光操作
       </p>
@@ -519,6 +519,8 @@ const FIXED_LAST_TWO = [
   { id: 14, text: '请靠边停车',                               answer: { light: 1, hazard: true } },
   { id: 15, text: '夜间灯光结束，请关闭所有灯光',             answer: { light: 0, hazard: false } }
 ];
+
+const FINAL_QUESTION = { id: 16, text: '请起步',              answer: { light: 0, hazard: false } };
  
 // ============ 状态 ============
 let examQuestions = [];
@@ -541,7 +543,7 @@ let audioUnlocked = false; // 用户手势内是否解锁过自动播放
 // 音频预加载池（同时作为"解锁播放"时可复用的 Audio 引用，避免频繁 new）
 const audioPreloadPool = {};
 (function preloadAllAudio(){
-  for (let i = 1; i <= 15; i++) {
+  for (let i = 1; i <= 16; i++) {
     try {
       const a = new Audio(`audio/${i}.mp3`);
       a.preload = 'auto';
@@ -585,9 +587,26 @@ function shuffle(arr) {
 }
  
 function buildExamQuestions() {
-  // 第1题固定 + 中间12题随机顺序全部出 + 最后2题固定
-  const middle = shuffle(MIDDLE_QUESTIONS);
-  return [FIXED_FIRST, ...middle, ...FIXED_LAST_TWO];
+  // 从 localStorage 获取上次使用过的中间题目ID集合
+  const lastUsedStr = localStorage.getItem('lastUsedMiddleIds');
+  let lastUsedIds = lastUsedStr ? JSON.parse(lastUsedStr) : [];
+
+  // 从12道中间题中选出未被上次使用的题目
+  let available = MIDDLE_QUESTIONS.filter(q => !lastUsedIds.includes(q.id));
+
+  // 如果可用题目不足6道（首次或已用完），重置为全部12道
+  if (available.length < 6) {
+    available = shuffle([...MIDDLE_QUESTIONS]);
+  }
+
+  // 随机选6道（若刚好6道则全部使用）
+  const selected = shuffle(available).slice(0, 6);
+
+  // 存储本次使用的题目ID，供下次考试使用（确保前后两次不重复）
+  localStorage.setItem('lastUsedMiddleIds', JSON.stringify(selected.map(q => q.id)));
+
+  // 第1题固定 + 中间6道随机 + 最后2题固定 + 最后一道"请起步"
+  return [FIXED_FIRST, ...selected, ...FIXED_LAST_TWO, FINAL_QUESTION];
 }
  
 // ============ 语音播报 ============
@@ -842,6 +861,17 @@ function startQuestion() {
   const q = examQuestions[currentIdx];
   document.getElementById('qContent').textContent = q.text;
   updateProgress();
+ 
+  // 最后一道题"请起步"：倒计时为0，直接结束本次考试
+  if (q.id === 16) {
+    examActive = false;
+    document.querySelectorAll('.btn').forEach(b => b.disabled = true);
+    playAudio(q.id, q.text, () => {
+      finishExam();
+    });
+    return;
+  }
+ 
   examActive = true;
  
   // 每次新题目时将灯光重置？根据真实考试，灯光状态是保留的，这里保留上一题状态
@@ -911,8 +941,8 @@ function finishExam() {
   stopCountdown();
   stopAudio();
   examActive = false;
-  const total = examQuestions.length;
-  const score = Math.round(passCount / total * 100);
+  const total = results.length; // 不包含"请起步"等未评分题
+  const score = total > 0 ? Math.round(passCount / total * 100) : 0;
 
   document.getElementById('examScreen').style.display = 'none';
   document.getElementById('resultScreen').style.display = 'block';
@@ -990,6 +1020,11 @@ function coachShowQuestion() {
 
   // 播放音频，播放完毕后开始5秒倒计时（自动模式下）
   playAudio(q.id, q.text, () => {
+    // 最后一道题"请起步"：直接结束演示
+    if (q.id === 16) {
+      setTimeout(() => finishCoachMode(), 500);
+      return;
+    }
     if (coachAutoPlay && currentIdx < examQuestions.length) {
       coachStartCountdown();
     }
@@ -1099,8 +1134,8 @@ function finishCoachMode() {
 
   document.getElementById('resultEmoji').textContent = '✅';
   document.getElementById('resultTitle').textContent = '演示完成！';
-  document.getElementById('resultScore').textContent = '15';
-  document.getElementById('resultSubtitle').textContent = '已播报全部 15 道题';
+  document.getElementById('resultScore').textContent = examQuestions.length;
+  document.getElementById('resultSubtitle').textContent = '已播报全部 10 道题';
 
   const detail = document.getElementById('resultDetail');
   detail.innerHTML = examQuestions.map((q, i) => `
